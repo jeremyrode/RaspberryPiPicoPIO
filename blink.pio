@@ -1,0 +1,31 @@
+.program blink
+.wrap_target
+  out y, 1                    ; Pull a bit into y, blocking if no data
+  jmp !y short_skip           ; If short pulse, skip long pulse setup
+  set y, 31                   ; Base for long
+  jmp long_skip               ; Skip over short setup
+short_skip:
+  set y, 16                    ; Base for short
+long_skip:
+  set pins, 1     [31]        ; Go high
+  set pins, 0                 ; Go Low
+delay_loop:
+  nop [31]
+  jmp y-- delay_loop [31]     ; Delay
+.wrap
+
+; this is a raw helper function for use by the user
+% c-sdk {
+  static inline void blink_program_init(PIO pio, uint sm, uint offset, uint pin) {
+    pio_gpio_init(pio, pin);  // Set this pin's GPIO function (connect PIO to the pad)
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true); // Set to output
+    pio_sm_config config = blink_program_get_default_config(offset); // Define a config object
+    // Use set to toggle the pin
+    sm_config_set_set_pins(&config, pin, 1);
+    sm_config_set_out_shift(&config, false, true, 12); //Output shift register config
+        //                   config, shift_right, Autopull, bits per word
+    sm_config_set_clkdiv_int_frac(&config,65535,0); // Set clock divider
+    pio_sm_init(pio, sm, offset, &config); // Apply the configuration
+    pio_sm_set_enabled(pio, sm, true); // Set the state machine running
+  }
+%}
